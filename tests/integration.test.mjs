@@ -211,6 +211,55 @@ test('products: search matches barcode and item code', async () => {
   }
 });
 
+test('barcode: batch lookup matches exact barcodes', async () => {
+  assert.ok(adminToken, 'missing admin token from auth setup');
+
+  const barcodeOne = `BATCH-${Date.now()}-1`;
+  const barcodeTwo = `BATCH-${Date.now()}-2`;
+  let createdIds = [];
+
+  try {
+    for (const barcode of [barcodeOne, barcodeTwo]) {
+      const createRes = await fetchJson('/api/products', {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({
+          name: `Batch Test ${barcode}`,
+          price: 8.25,
+          quantity: 2,
+          barcode,
+        }),
+      });
+
+      assert.equal(createRes.status, 201);
+      const created = await createRes.json();
+      createdIds.push(created.id);
+    }
+
+    const batchRes = await fetchJson('/api/products/scan-batch', {
+      method: 'POST',
+      body: JSON.stringify({
+        barcodes: [barcodeOne, barcodeTwo, 'MISSING-BATCH-CODE'],
+      }),
+    });
+
+    assert.equal(batchRes.status, 200);
+    const batchJson = await batchRes.json();
+    assert.equal(batchJson.success, true);
+    assert.equal(batchJson.products.length, 2);
+    assert.ok(batchJson.products.some((product) => product.barcode === barcodeOne));
+    assert.ok(batchJson.products.some((product) => product.barcode === barcodeTwo));
+    assert.deepEqual(batchJson.notFound, ['MISSING-BATCH-CODE']);
+  } finally {
+    for (const id of createdIds) {
+      await fetch(`${base}/api/products/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      }).catch(() => {});
+    }
+  }
+});
+
 test('sales: manager role cannot create sales', async () => {
   assert.ok(adminToken, 'missing admin token from auth setup');
 

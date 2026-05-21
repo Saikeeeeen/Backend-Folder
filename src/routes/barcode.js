@@ -93,18 +93,22 @@ router.get('/scan/:barcode?', (req, res) => {
 router.post('/scan-batch', (req, res) => {
   const { barcodes } = req.body;
 
+  const normalizedBarcodes = barcodes
+    .map((code) => String(code).trim())
+    .filter((code) => code.length > 0);
+
   // Validate input
-  if (!Array.isArray(barcodes) || barcodes.length === 0) {
+  if (!Array.isArray(barcodes) || normalizedBarcodes.length === 0) {
     return res.status(400).json({ error: 'Barcodes array is required and must not be empty' });
   }
 
-  if (barcodes.length > 100) {
+  if (normalizedBarcodes.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 barcodes per request' });
   }
 
-  const placeholders = barcodes.map(() => '(? OR ?)').join(' OR ');
+  const placeholders = normalizedBarcodes.map(() => '(item_code = ? OR barcode = ?)').join(' OR ');
   const params = [];
-  barcodes.forEach((code) => {
+  normalizedBarcodes.forEach((code) => {
     params.push(code, code);
   });
 
@@ -132,7 +136,7 @@ router.post('/scan-batch', (req, res) => {
       const foundBarcodes = new Set(
         rows.flatMap((row) => [row.item_code, row.barcode])
       );
-      const notFound = barcodes.filter((code) => !foundBarcodes.has(code));
+      const notFound = normalizedBarcodes.filter((code) => !foundBarcodes.has(code));
 
       res.json({
         success: true,
