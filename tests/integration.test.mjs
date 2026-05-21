@@ -268,8 +268,9 @@ test('sales: admin can create a sale', async () => {
     headers: authHeaders(adminToken),
   });
   assert.equal(productsRes.status, 200);
-  const products = await productsRes.json();
-  const product = products.find((item) => Number(item.quantity) > 0);
+  const productsJson = await productsRes.json();
+  const products = Array.isArray(productsJson) ? productsJson : productsJson.data || [];
+  const product = products.find((item) => Number(item.quantity ?? 0) > 0) || products[0];
   assert.ok(product, 'expected at least one product with stock');
   const saleRes = await fetchJson('/api/sales', {
     method: 'POST',
