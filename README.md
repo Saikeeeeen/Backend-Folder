@@ -47,6 +47,8 @@ The barcode lookup endpoints are:
 - `GET /api/products/scan?barcode=12345`
 - `POST /api/products/scan-batch`
 
+The existing product search endpoint also matches `barcode` and `item_code`, so the current cashier screen can find scanned products without moving any frontend UI.
+
 ## Database maintenance
 
 The SQLite database is stored at `data/database.sqlite`.

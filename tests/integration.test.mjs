@@ -171,6 +171,46 @@ test('barcode: lookup works with query param', async () => {
   }
 });
 
+test('products: search matches barcode and item code', async () => {
+  assert.ok(adminToken, 'missing admin token from auth setup');
+
+  const barcode = `SRCH-${Date.now()}`;
+  let createdId;
+
+  try {
+    const createRes = await fetchJson('/api/products', {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: JSON.stringify({
+        name: `Search Test ${Date.now()}`,
+        price: 7.5,
+        quantity: 3,
+        barcode,
+        sku: `SKU-${Date.now()}`,
+      }),
+    });
+
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const searchRes = await fetch(`${base}/api/products?page=1&limit=50&search=${encodeURIComponent(barcode)}`);
+    assert.equal(searchRes.status, 200);
+
+    const searchJson = await searchRes.json();
+    const rows = Array.isArray(searchJson) ? searchJson : searchJson.data || [];
+
+    assert.ok(rows.some((row) => row.barcode === barcode || row.item_code === barcode), 'expected barcode search to return the created product');
+  } finally {
+    if (createdId) {
+      await fetch(`${base}/api/products/${createdId}`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      }).catch(() => {});
+    }
+  }
+});
+
 test('sales: manager role cannot create sales', async () => {
   assert.ok(adminToken, 'missing admin token from auth setup');
 

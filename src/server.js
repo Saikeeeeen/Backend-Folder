@@ -400,12 +400,34 @@ async function authenticate(req, res, next) {
   }
 }
 
-const getProductList = (limit = 10, offset = 0) =>
-  dbAll(`
+const buildProductSearchClause = (search) => {
+  if (!search) {
+    return { where: '', params: [] };
+  }
+
+  const term = `%${String(search).toLowerCase()}%`;
+  return {
+    where: `
+      WHERE (
+        LOWER(COALESCE(p.name, '')) LIKE ?
+        OR LOWER(COALESCE(p.sku, '')) LIKE ?
+        OR LOWER(COALESCE(p.barcode, '')) LIKE ?
+        OR LOWER(COALESCE(p.item_code, '')) LIKE ?
+      )
+    `,
+    params: [term, term, term, term],
+  };
+};
+
+const getProductList = (limit = 10, offset = 0, search = '') => {
+  const searchClause = buildProductSearchClause(search);
+
+  return dbAll(`
     SELECT
       p.id,
       p.name,
       p.sku,
+      p.item_code,
       p.barcode,
       p.price,
       p.cost,
@@ -420,9 +442,11 @@ const getProductList = (limit = 10, offset = 0) =>
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
     LEFT JOIN units u ON u.id = p.unit_id
+    ${searchClause.where}
     ORDER BY p.id DESC
     LIMIT ? OFFSET ?
-  `, [limit, offset]);
+  `, [...searchClause.params, limit, offset]);
+};
 
 const getProductById = (id) =>
   dbGet(
@@ -1396,13 +1420,19 @@ app.get(PRODUCT_ROUTES, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
     const limit = Math.max(1, Math.min(50, parseInt(req.query.limit || '10', 10))); // Max 50 per page, default 10
     const offset = (page - 1) * limit;
+    const search = String(req.query.search || '').trim();
+
+    const searchClause = buildProductSearchClause(search);
 
     // Get total count
-    const countResult = await dbGet('SELECT COUNT(*) AS count FROM products');
+    const countResult = await dbGet(
+      `SELECT COUNT(*) AS count FROM products p ${searchClause.where}`,
+      searchClause.params
+    );
     const total = countResult?.count || 0;
 
     // Get paginated products
-    const products = await getProductList(limit, offset);
+    const products = await getProductList(limit, offset, search);
 
     // Return paginated response
     res.json({
