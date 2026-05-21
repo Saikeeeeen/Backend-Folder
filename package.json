@@ -1,0 +1,24 @@
+{
+  "name": "pos-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "db:backup": "node scripts/backup-db.js",
+    "db:restore": "node scripts/restore-db.js",
+    "db:init-barcode": "node scripts/init-barcode.js",
+    "db:import-products": "node scripts/import-products.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.7",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "helmet": "^8.0.0",
+    "express-rate-limit": "^8.0.0"
+  }
+}
