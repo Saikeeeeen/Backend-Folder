@@ -1,8 +1,17 @@
 # POS Backend
 
-Minimal Express + SQLite API for testing with Thunder Client.
+Express + SQLite backend for the POS project.
+
+## What is included
+
+- Product, sales, user, store, customer, supplier, brand, category, and unit APIs
+- Barcode scanning lookup for scanners
+- SQLite backup and restore scripts
+- Optional SQLCipher support if your local SQLite build supports it
 
 ## Install
+
+Run this once after cloning the repository:
 
 ```bash
 npm install
@@ -10,13 +19,37 @@ npm install
 
 ## Run
 
+Start the server with:
+
 ```bash
 npm start
 ```
 
-## Database Maintenance
+The server runs on `http://127.0.0.1:3000` by default.
 
-The SQLite database lives at `data/database.sqlite` in the project root.
+## Barcode setup
+
+If you want barcode lookup to work with your existing product data, run:
+
+```bash
+npm run db:init-barcode
+```
+
+If you are importing product data from CSV, use:
+
+```bash
+npm run db:import-products -- ./products.csv
+```
+
+The barcode lookup endpoints are:
+
+- `GET /api/products/scan/:barcode`
+- `GET /api/products/scan?barcode=12345`
+- `POST /api/products/scan-batch`
+
+## Database maintenance
+
+The SQLite database is stored at `data/database.sqlite`.
 
 Create a backup:
 
@@ -30,40 +63,46 @@ Restore from a backup file:
 npm run db:restore -- backups/database-YYYY-MM-DDTHH-MM-SS-sssZ.sqlite
 ```
 
-Backups are stored in the `backups/` folder.
+Backups are saved in the `backups/` folder.
 
-### SQLCipher (optional)
+## SQLCipher optional support
 
-This project can work with an SQLite build compiled with SQLCipher. To enable encrypted databases:
+This project can work with a SQLCipher-enabled SQLite build if you have one installed.
 
-- Install a SQLCipher-enabled SQLite library on your system and rebuild the native `sqlite3` bindings for Node (platform-specific steps required on Windows).
-- Set an encryption key in the environment before starting the server, for example `SQLCIPHER_KEY=your_secret` or `DB_ENCRYPTION_KEY=your_secret`.
-- When a key is provided and the native build exposes SQLCipher, the application will run `PRAGMA key = '...'` at startup.
+To use it:
 
-Notes:
-- If your `sqlite3` binary is not compiled with SQLCipher, the app will warn and continue using an unencrypted DB.
-- Converting an existing plain DB to an encrypted one requires a SQLCipher-enabled build and running `PRAGMA rekey = 'newkey'`.
+- Install a SQLCipher-enabled SQLite build for Node on your system.
+- Set `SQLCIPHER_KEY` or `DB_ENCRYPTION_KEY` before starting the server.
+- Start the app normally with `npm start`.
 
-## Endpoints
+If your local SQLite package does not support SQLCipher, the app will continue using the normal unencrypted database.
 
-- `GET /health`
-- `GET /products`
-- `GET /products/:id`
-- `POST /products`
-- `PUT /products/:id`
-- `DELETE /products/:id`
-- `GET /api/products/scan/:barcode` or `GET /api/products/scan?barcode=12345`
-- `POST /api/products/scan-batch`
+## API used for barcode fetching
 
-For scanner integration, the barcode lookup accepts either the path form or a `barcode` query string, so an existing frontend handler can call whichever is easiest without changing the page layout.
+Use this endpoint from the frontend or scanner handler:
 
-## Thunder Client example
+```bash
+GET /api/products/scan?barcode=12345
+```
 
-### Create product
+Example fetch:
 
-Method: `POST`
-URL: `http://localhost:3000/products`
-Body JSON:
+```js
+const response = await fetch(`http://127.0.0.1:3000/api/products/scan?barcode=${encodeURIComponent(barcode)}`);
+const data = await response.json();
+```
+
+## Testing
+
+Run the test suite with:
+
+```bash
+npm test
+```
+
+## Example product request
+
+Create a product with Thunder Client or any API tool:
 
 ```json
 {
