@@ -171,6 +171,47 @@ test('barcode: lookup works with query param', async () => {
   }
 });
 
+test('products: exact item code search works', async () => {
+  assert.ok(adminToken, 'missing admin token from auth setup');
+
+  const itemCode = `ITEM-${Date.now()}`;
+  let createdId;
+
+  try {
+    const createRes = await fetchJson('/api/products', {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: JSON.stringify({
+        name: `Item Code Test ${Date.now()}`,
+        price: 6.5,
+        quantity: 4,
+        item_code: itemCode,
+        barcode: itemCode,
+      }),
+    });
+
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const searchRes = await fetch(`${base}/api/products/search?item_code=${encodeURIComponent(itemCode)}`);
+    assert.equal(searchRes.status, 200);
+
+    const searchJson = await searchRes.json();
+    assert.equal(searchJson.pagination.total, 1);
+    assert.equal(searchJson.data.length, 1);
+    assert.equal(searchJson.data[0].item_code, itemCode);
+    assert.equal(searchJson.data[0].barcode, itemCode);
+  } finally {
+    if (createdId) {
+      await fetch(`${base}/api/products/${createdId}`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      }).catch(() => {});
+    }
+  }
+});
+
 test('products: search matches barcode and item code', async () => {
   assert.ok(adminToken, 'missing admin token from auth setup');
 
@@ -201,6 +242,44 @@ test('products: search matches barcode and item code', async () => {
     const rows = Array.isArray(searchJson) ? searchJson : searchJson.data || [];
 
     assert.ok(rows.some((row) => row.barcode === barcode || row.item_code === barcode), 'expected barcode search to return the created product');
+  } finally {
+    if (createdId) {
+      await fetch(`${base}/api/products/${createdId}`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      }).catch(() => {});
+    }
+  }
+});
+
+test('products: search matches item name as you type', async () => {
+  assert.ok(adminToken, 'missing admin token from auth setup');
+
+  const name = `Live Search ${Date.now()}`;
+  let createdId;
+
+  try {
+    const createRes = await fetchJson('/api/products', {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: JSON.stringify({
+        name,
+        price: 12.5,
+        quantity: 2,
+        item_code: `CODE-${Date.now()}`,
+      }),
+    });
+
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const searchRes = await fetch(`${base}/api/products?search=${encodeURIComponent('Live Search')}`);
+    assert.equal(searchRes.status, 200);
+
+    const searchJson = await searchRes.json();
+    const rows = Array.isArray(searchJson) ? searchJson : searchJson.data || [];
+    assert.ok(rows.some((row) => row.id === created.id && row.name === name), 'expected name search to return the created product');
   } finally {
     if (createdId) {
       await fetch(`${base}/api/products/${createdId}`, {

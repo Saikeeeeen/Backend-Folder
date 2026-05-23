@@ -99,9 +99,10 @@ const simpleTables = {
   },
 };
 
-const productColumns = ['name', 'sku', 'barcode', 'price', 'cost', 'quantity', 'category_id', 'brand_id', 'unit_id'];
+const productColumns = ['name', 'item_code', 'sku', 'barcode', 'price', 'cost', 'quantity', 'category_id', 'brand_id', 'unit_id'];
 
 const PRODUCT_ROUTES = ['/products', '/api/products'];
+const PRODUCT_SEARCH_ROUTES = ['/products/search', '/api/products/search'];
 const PRODUCT_DETAIL_ROUTES = ['/products/:id', '/api/products/:id'];
 const SALES_ROUTES = ['/sales', '/api/sales'];
 const SALES_DETAIL_ROUTES = ['/sales/:id', '/api/sales/:id'];
@@ -419,8 +420,34 @@ const buildProductSearchClause = (search) => {
   };
 };
 
+const buildProductSearchOrderClause = (search) => {
+  const term = String(search ?? '').trim().toLowerCase();
+
+  if (!term) {
+    return { orderBy: 'ORDER BY p.id DESC', params: [] };
+  }
+
+  const prefix = `${term}%`;
+
+  return {
+    orderBy: `
+      ORDER BY
+        CASE
+          WHEN LOWER(COALESCE(p.item_code, '')) = ? THEN 0
+          WHEN LOWER(COALESCE(p.name, '')) = ? THEN 1
+          WHEN LOWER(COALESCE(p.item_code, '')) LIKE ? THEN 2
+          WHEN LOWER(COALESCE(p.name, '')) LIKE ? THEN 3
+          ELSE 4
+        END,
+        p.id DESC
+    `,
+    params: [term, term, prefix, prefix],
+  };
+};
+
 const getProductList = (limit = 10, offset = 0, search = '') => {
   const searchClause = buildProductSearchClause(search);
+  const orderClause = buildProductSearchOrderClause(search);
 
   return dbAll(`
     SELECT
@@ -443,35 +470,43 @@ const getProductList = (limit = 10, offset = 0, search = '') => {
     LEFT JOIN brands b ON b.id = p.brand_id
     LEFT JOIN units u ON u.id = p.unit_id
     ${searchClause.where}
-    ORDER BY p.id DESC
+    ${orderClause.orderBy}
     LIMIT ? OFFSET ?
-  `, [...searchClause.params, limit, offset]);
+  `, [...searchClause.params, ...orderClause.params, limit, offset]);
 };
+
+const productDetailSelectSql = `
+  SELECT
+    p.id,
+    p.name,
+    p.sku,
+    p.item_code,
+    p.barcode,
+    p.price,
+    p.cost,
+    p.category_id,
+    p.brand_id,
+    p.unit_id,
+    c.name AS category_name,
+    b.name AS brand_name,
+    u.name AS unit_name,
+    u.short_name AS unit_short_name
+  FROM products p
+  LEFT JOIN categories c ON c.id = p.category_id
+  LEFT JOIN brands b ON b.id = p.brand_id
+  LEFT JOIN units u ON u.id = p.unit_id
+`;
 
 const getProductById = (id) =>
   dbGet(
-    `
-      SELECT
-        p.id,
-        p.name,
-        p.sku,
-        p.barcode,
-        p.price,
-        p.cost,
-        p.category_id,
-        p.brand_id,
-        p.unit_id,
-        c.name AS category_name,
-        b.name AS brand_name,
-        u.name AS unit_name,
-        u.short_name AS unit_short_name
-      FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN brands b ON b.id = p.brand_id
-      LEFT JOIN units u ON u.id = p.unit_id
-      WHERE p.id = ?
-    `,
+    `${productDetailSelectSql} WHERE p.id = ?`,
     [id]
+  );
+
+const getProductByLookup = (lookup) =>
+  dbGet(
+    `${productDetailSelectSql} WHERE p.item_code = ? OR p.barcode = ? OR p.sku = ?`,
+    [lookup, lookup, lookup]
   );
 
 const getBootstrapData = async () => ({
@@ -1449,6 +1484,63 @@ app.get(PRODUCT_ROUTES, async (req, res) => {
   }
 });
 
+app.get(PRODUCT_SEARCH_ROUTES, async (req, res) => {
+  try {
+    const lookup = String(req.query.item_code ?? req.query.itemCode ?? req.query.q ?? req.query.search ?? '').trim();
+
+    if (!lookup) {
+      res.status(400).json({ error: 'Search term or item code is required' });
+      return;
+    }
+
+    const exactLookup = req.query.item_code !== undefined || req.query.itemCode !== undefined;
+
+    if (exactLookup) {
+      const product = await getProductByLookup(lookup);
+
+      if (!product) {
+        res.status(404).json({ error: 'Product not found' });
+        return;
+      }
+
+      res.json({
+        data: [product],
+        pagination: {
+          page: 1,
+          limit: 1,
+          total: 1,
+          pages: 1,
+        },
+      });
+      return;
+    }
+
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit || '10', 10)));
+    const offset = (page - 1) * limit;
+    const searchClause = buildProductSearchClause(lookup);
+
+    const countResult = await dbGet(
+      `SELECT COUNT(*) AS count FROM products p ${searchClause.where}`,
+      searchClause.params
+    );
+    const total = countResult?.count || 0;
+    const products = await getProductList(limit, offset, lookup);
+
+    res.json({
+      data: products,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    sendDbError(res, error);
+  }
+});
+
 app.get(PRODUCT_DETAIL_ROUTES, (req, res) => {
   getProductById(req.params.id)
     .then((row) => {
@@ -1563,16 +1655,23 @@ const handleSaleCreate = async (req, res) => {
     const paymentMethodId = saleBody.payment_method_id ?? null;
     const customerId = saleBody.customer_id ?? null;
     const userId = saleBody.user_id ?? req.user?.id ?? null;
-    const storeId = saleBody.store_id ?? req.user?.store_id ?? null;
+    const authUser = req.user?.id ? await dbGet('SELECT store_id FROM users WHERE id = ?', [req.user.id]) : null;
+    const storeId = saleBody.store_id ?? authUser?.store_id ?? null;
+
+    if (!storeId) {
+      const error = new Error('store_id is required');
+      error.status = 400;
+      throw error;
+    }
+
+    await dbRun('BEGIN IMMEDIATE TRANSACTION');
 
     let subtotal = 0;
     const resolvedItems = [];
 
-    await dbRun('BEGIN TRANSACTION');
-
     for (const item of items) {
       if (!item.product_id || !item.quantity) {
-        const error = new Error('Each item requires product_id and quantity');
+        const error = new Error('Each item must include product_id and quantity');
         error.status = 400;
         throw error;
       }
@@ -1836,17 +1935,41 @@ app.post(CHANGE_PASSWORD_ROUTES, authenticate, async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-});
+const ensureProductBarcodeColumns = async () => {
+  const columns = await dbAll('PRAGMA table_info(products)');
+  const columnNames = new Set(columns.map((column) => column.name));
 
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Stop the other server or change PORT.`);
-    process.exitCode = 1;
-    return;
+  if (!columnNames.has('item_code')) {
+    await dbRun('ALTER TABLE products ADD COLUMN item_code TEXT');
   }
 
-  console.error('Server failed to start:', error.message);
-  process.exitCode = 1;
-});
+  if (!columnNames.has('barcode')) {
+    await dbRun('ALTER TABLE products ADD COLUMN barcode TEXT');
+  }
+};
+
+const startServer = async () => {
+  try {
+    await ensureProductBarcodeColumns();
+
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`Server running on http://${HOST}:${PORT}`);
+    });
+
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Stop the other server or change PORT.`);
+        process.exitCode = 1;
+        return;
+      }
+
+      console.error('Server failed to start:', error.message);
+      process.exitCode = 1;
+    });
+  } catch (error) {
+    console.error('Database migration failed:', error.message);
+    process.exitCode = 1;
+  }
+};
+
+startServer();

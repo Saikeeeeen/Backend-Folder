@@ -21,9 +21,9 @@ const findProductByBarcode = (barcode, res) => {
       brand_id, 
       unit_id 
      FROM products 
-     WHERE item_code = ? OR barcode = ? 
+    WHERE item_code = ? OR barcode = ? OR sku = ?
      LIMIT 1`,
-    [barcode, barcode],
+      [barcode, barcode, barcode],
     (err, row) => {
       if (err) {
         console.error('Barcode scan error:', err);
@@ -106,10 +106,10 @@ router.post('/scan-batch', (req, res) => {
     return res.status(400).json({ error: 'Maximum 100 barcodes per request' });
   }
 
-  const placeholders = normalizedBarcodes.map(() => '(item_code = ? OR barcode = ?)').join(' OR ');
+  const placeholders = normalizedBarcodes.map(() => '(item_code = ? OR barcode = ? OR sku = ?)').join(' OR ');
   const params = [];
   normalizedBarcodes.forEach((code) => {
-    params.push(code, code);
+    params.push(code, code, code);
   });
 
   db.all(

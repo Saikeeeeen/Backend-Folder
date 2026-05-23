@@ -47,6 +47,11 @@ The barcode lookup endpoints are:
 - `GET /api/products/scan?barcode=12345`
 - `POST /api/products/scan-batch`
 
+For the product search bar, use:
+
+- `GET /api/products/search?q=rice`
+- `GET /api/products/search?item_code=SKU001`
+
 The existing product search endpoint also matches `barcode` and `item_code`, so the current cashier screen can find scanned products without moving any frontend UI.
 
 ## Database maintenance
