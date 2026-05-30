@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,6 +46,11 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 
+// Request logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+  skip: (req, _res) => req.path === '/health' || req.path === '/ready',
+}));
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -57,7 +63,7 @@ const isLocalOrigin = (origin) => {
     return true;
   }
 
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  return /^https?:\/\/(localhost|127\.0\.0\.1|thunderclient\.com)(:\d+)?$/i.test(origin);
 };
 
 const simpleTables = {
@@ -963,6 +969,17 @@ app.use(
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+// Readiness endpoint: confirms DB initialized and reachable
+app.get('/ready', async (_req, res) => {
+  try {
+    await dbGet('SELECT 1 AS ok');
+    await dbReady;
+    res.json({ status: 'ok' });
+  } catch (error) {
+    res.status(503).json({ status: 'unavailable', error: error.message });
+  }
+});
 
 // Barcode scanning routes
 app.use('/api/products', barcodeRoutes);
@@ -1952,7 +1969,8 @@ const startServer = async () => {
   try {
     await ensureProductBarcodeColumns();
 
-    const server = app.listen(PORT, HOST, () => {
+    // Start HTTP server and keep a reference for graceful shutdown
+    server = app.listen(PORT, HOST, () => {
       console.log(`Server running on http://${HOST}:${PORT}`);
     });
 
@@ -1971,5 +1989,50 @@ const startServer = async () => {
     process.exitCode = 1;
   }
 };
+
+// Global error handler for uncaught errors in middleware/handlers
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err && err.stack ? err.stack : err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// Graceful shutdown helpers
+let server;
+
+const shutdown = (signal) => {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  try {
+    if (server) {
+      server.close(() => {
+        console.log('HTTP server closed. Closing DB.');
+        db.close(() => {
+          console.log('DB connection closed. Exiting.');
+          process.exit(0);
+        });
+      });
+    } else {
+      db.close(() => process.exit(0));
+    }
+    // Force exit after 10s
+    setTimeout(() => {
+      console.error('Forcing shutdown');
+      process.exit(1);
+    }, 10000);
+  } catch (err) {
+    console.error('Error during shutdown:', err);
+    process.exit(1);
+  }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
 
 startServer();

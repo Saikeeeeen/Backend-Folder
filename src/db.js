@@ -603,6 +603,6 @@ const initDatabase = async () => {
   }
 };
 
-initDatabase();
+export const dbReady = initDatabase();
 
 export default db;

@@ -7,9 +7,11 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "db:backup": "node scripts/backup-db.js",
+    "db:recover": "node scripts/recover-db.js",
     "db:restore": "node scripts/restore-db.js",
     "db:init-barcode": "node scripts/init-barcode.js",
     "db:import-products": "node scripts/import-products.js",
+    "db:import-inventory": "node scripts/import-inventory-xlsx.js",
     "test": "node --test"
   },
   "dependencies": {
@@ -19,6 +21,8 @@
     "express-rate-limit": "^8.0.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.0",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "^6.0.1",
+    "xlsx": "^0.18.5",
+    "morgan": "^1.10.0"
   }
 }
