@@ -11,7 +11,11 @@
     "db:restore": "node scripts/restore-db.js",
     "db:init-barcode": "node scripts/init-barcode.js",
     "db:import-products": "node scripts/import-products.js",
+<<<<<<< HEAD
     "db:seed-sales": "node scripts/seed-sales.js",
+=======
+    "db:import-inventory": "node scripts/import-inventory-xlsx.js",
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
     "test": "node --test"
   },
   "dependencies": {
@@ -22,6 +26,10 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.0",
     "sqlite3": "^6.0.1",
+<<<<<<< HEAD
+=======
+    "xlsx": "^0.18.5",
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
     "morgan": "^1.10.0"
   }
 }

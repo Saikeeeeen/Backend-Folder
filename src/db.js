@@ -192,6 +192,7 @@ const seedIfEmpty = async (table, column, values) => {
   }
 };
 
+<<<<<<< HEAD
 const seedAccessCodes = async () => {
   const starterAccessCodes = [
     { storeNames: ['Main Branch', 'Main Branch Updated'], code: '1234' },
@@ -238,6 +239,8 @@ const seedAccessCodes = async () => {
   }
 };
 
+=======
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
 const initDatabase = async () => {
   try {
     await runAsync('PRAGMA foreign_keys = ON');
@@ -537,6 +540,47 @@ const initDatabase = async () => {
       }
     }
 
+<<<<<<< HEAD
+=======
+    const starterAccessCodes = [
+      { storeNames: ['Main Branch', 'Main Branch Updated'], code: '1234' },
+      { storeNames: ['North Branch'], code: '5678' },
+      { storeNames: ['South Branch'], code: '9012' },
+      { storeNames: ['Central Branch'], code: '3456' },
+    ];
+
+    for (const starter of starterAccessCodes) {
+      const store = await getAsync(
+        `SELECT id FROM stores WHERE name IN (${starter.storeNames.map(() => '?').join(', ')}) ORDER BY id ASC LIMIT 1`,
+        starter.storeNames
+      );
+
+      if (!store?.id) {
+        continue;
+      }
+
+      const existingAccessCode = await getAsync('SELECT id FROM access_codes WHERE code = ?', [starter.code]);
+      if (existingAccessCode) {
+        continue;
+      }
+
+      await runAsync('INSERT INTO access_codes (store_id, code, status) VALUES (?, ?, ?)', [store.id, starter.code, 'unused']);
+    }
+
+    // Migrate any existing plain-text passwords to bcrypt hashes
+    try {
+      const allUsers = await allAsync('SELECT id, password FROM users');
+      for (const u of allUsers) {
+        if (!u.password) continue;
+        if (typeof u.password === 'string' && u.password.startsWith('$2')) continue;
+        const hashed = await bcrypt.hash(u.password, 10);
+        await runAsync('UPDATE users SET password = ? WHERE id = ?', [hashed, u.id]);
+      }
+    } catch (err) {
+      console.error('Password migration failed:', err.message);
+    }
+
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
     // Keep the built-in demo accounts usable for offline testing.
     const demoAccounts = [
       { email: 'admin@local', password: 'admin123', username: 'admin' },
@@ -593,6 +637,7 @@ const initDatabase = async () => {
       }
     }
 
+<<<<<<< HEAD
     await runAsync('UPDATE products SET quantity = 999999');
 
     await seedAccessCodes();
@@ -608,6 +653,20 @@ const initDatabase = async () => {
       }
     } catch (err) {
       console.error('Password migration failed:', err.message);
+=======
+    const settings = [
+      ['store_name', 'POS Store'],
+      ['currency', 'USD'],
+      ['tax_rate', '0'],
+      ['receipt_footer', 'Thank you for shopping with us'],
+    ];
+
+    for (const [key, value] of settings) {
+      const existing = await getAsync('SELECT id FROM settings WHERE key = ?', [key]);
+      if (!existing) {
+        await runAsync('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);
+      }
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
     }
   } catch (error) {
     console.error('Database initialization failed:', error.message);

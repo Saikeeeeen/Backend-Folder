@@ -41,6 +41,7 @@ If you are importing product data from CSV, use:
 npm run db:import-products -- ./products.csv
 ```
 
+<<<<<<< HEAD
 For your inventory master file, you can import it directly from Downloads:
 
 ```bash
@@ -51,6 +52,8 @@ The importer maps the first Item Code column to `item_code`, the second Item Cod
 
 There is no Excel import script in this repository anymore, so `xlsx` is no longer installed.
 
+=======
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
 The barcode lookup endpoints are:
 
 - `GET /api/products/scan/:barcode`
@@ -82,6 +85,7 @@ npm run db:restore -- backups/database-YYYY-MM-DDTHH-MM-SS-sssZ.sqlite
 
 Backups are saved in the `backups/` folder.
 
+<<<<<<< HEAD
 Seed dummy sales data:
 
 ```bash
@@ -103,6 +107,8 @@ To preserve everything when copying to another laptop or PC:
 
 If you want one portable database file instead of the WAL trio, make a backup with `npm run db:backup` and copy that `.sqlite` file.
 
+=======
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
 ## SQLCipher optional support
 
 This project can work with a SQLCipher-enabled SQLite build if you have one installed.

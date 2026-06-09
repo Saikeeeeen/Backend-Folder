@@ -19,7 +19,11 @@ const findProductByBarcode = (barcodeOrQuery, res) => {
       barcode, 
       price, 
       cost, 
+<<<<<<< HEAD
       999999 AS quantity, 
+=======
+      quantity, 
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
       category_id, 
       brand_id, 
       unit_id 
@@ -41,7 +45,11 @@ const findProductByBarcode = (barcodeOrQuery, res) => {
       const term = `%${raw.toLowerCase()}%`;
       db.get(
         `SELECT 
+<<<<<<< HEAD
           id, name, item_code, barcode, price, cost, 999999 AS quantity, category_id, brand_id, unit_id
+=======
+          id, name, item_code, barcode, price, cost, quantity, category_id, brand_id, unit_id
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
          FROM products
          WHERE LOWER(name) LIKE ? OR LOWER(sku) = ? OR LOWER(item_code) = ? OR LOWER(barcode) = ?
          ORDER BY CASE WHEN LOWER(name) = ? THEN 0 ELSE 1 END, id ASC
@@ -143,7 +151,11 @@ router.post('/scan-batch', (req, res) => {
       barcode, 
       price, 
       cost, 
+<<<<<<< HEAD
       999999 AS quantity, 
+=======
+      quantity, 
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
       category_id, 
       brand_id, 
       unit_id 

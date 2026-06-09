@@ -763,7 +763,11 @@ const getStoreInventory = (storeId) =>
         c.name AS category,
         b.name AS brand,
         u.name AS unit,
+<<<<<<< HEAD
         999999 AS stock,
+=======
+        p.quantity AS stock,
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
         p.price,
         p.cost,
         p.created_at
@@ -1704,6 +1708,15 @@ const handleSaleCreate = async (req, res) => {
       const price = Number(item.price ?? product.price);
       const lineTotal = price * quantity;
 
+<<<<<<< HEAD
+=======
+      if (Number(product.quantity) < quantity) {
+        const error = new Error(`Insufficient stock for ${product.name}`);
+        error.status = 400;
+        throw error;
+      }
+
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
       subtotal += lineTotal;
       resolvedItems.push({ product, quantity, price, total: lineTotal });
     }
@@ -1725,6 +1738,11 @@ const handleSaleCreate = async (req, res) => {
         [saleId, item.product.id, item.quantity, item.price, item.total]
       );
 
+<<<<<<< HEAD
+=======
+      await dbRun('UPDATE products SET quantity = quantity - ? WHERE id = ?', [item.quantity, item.product.id]);
+
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
       await dbRun(
         'INSERT INTO inventory_movements (product_id, movement_type, quantity, note) VALUES (?, ?, ?, ?)',
         [item.product.id, 'sale', item.quantity, `Sale ${invoiceNo}`]
@@ -1746,6 +1764,7 @@ const handleSaleCreate = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 app.get(SALES_ROUTES, async (req, res) => {
   try {
     const page = Math.max(1, Number.parseInt(req.query.page || '1', 10) || 1);
@@ -1794,6 +1813,27 @@ app.get(SALES_ROUTES, async (req, res) => {
     sendDbError(res, error);
   }
 }); 
+=======
+app.get(SALES_ROUTES, (_req, res) => {
+  dbAll(`${getSaleSummaryQuery} ORDER BY s.id DESC`)
+    .then((rows) => res.json(rows))
+    .catch((error) => sendDbError(res, error));
+});
+
+app.get(SALES_DETAIL_ROUTES, (req, res) => {
+  getSaleDetails(req.params.id)
+    .then((sale) => {
+      if (!sale) {
+        res.status(404).json({ error: 'Sale not found' });
+        return;
+      }
+
+      res.json(sale);
+    })
+    .catch((error) => sendDbError(res, error));
+});
+
+>>>>>>> e13a607fbd83684ad5e430c73b17ba04f8d80f48
 app.post(SALES_ROUTES, authenticate, requireRoleNames(ALLOWED_SALE_ROLES), handleSaleCreate);
 
 const handleLogin = async (req, res) => {
